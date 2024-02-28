@@ -2,18 +2,29 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/version.h>
-#include <linux/types.h>
-#include <linux/kdev_t.h>
 #include <linux/fs.h>
-#include <linux/device.h>
+#include <linux/proc_fs.h>
 #include <linux/cdev.h>
+#include <linux/uaccess.h>
+#include <linux/slab.h>
+#include <linux/ioctl.h>
+#include <linux/kernel_stat.h>
+#include <linux/types.h> /* u64 */
+#include <linux/cpumask.h>
+#include <linux/vmalloc.h>
+#include <linux/tick.h>
+#include <linux/jiffies.h>
+#include <linux/time64.h>
+#include <linux/math64.h>
+#include <linux/utsname.h>
+
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Aleksei Lapin");
 MODULE_DESCRIPTION("Simple module to start");
 
 #define DEVICE_NAME "io_lab"
 
-#define BUF_SIZE;
+#define BUF_SIZE 256
 
 char ibuf[BUF_SIZE];
 static u64 coma_count = 0; 
@@ -105,10 +116,10 @@ static int __init chdrv_init(void){
     }
 
     /* cdev structure initialization */
-    cdev_init(&cs_dev, &fops);
+    cdev_init(&io_dev, &fops);
 
     /* Adding device to the system */
-    if(cdev_add(&cs_dev, major, 1) < 0){
+    if(cdev_add(&io_dev, major, 1) < 0){
         pr_err("Cannot add the device to the system.\n");
         goto rm_major;
     }
@@ -142,3 +153,6 @@ static void __exit chdrv_exit(void){
     unregister_chrdev_region(major, 1);
     pr_info("cpu_stat: Module unloaded.\n");
 }
+
+module_init(chdrv_init);
+module_exit(chdrv_exit);
