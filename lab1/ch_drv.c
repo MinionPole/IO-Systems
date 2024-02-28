@@ -57,12 +57,13 @@ static ssize_t my_read(struct file *filp, char __user *buf, size_t len, loff_t *
     for(i = 0; i < BUF_SIZE;i++)
         ibuf[i] = 0;
     sprintf(ibuf, "%lld", coma_count);
-
     int count = strlen(ibuf);
+    ibuf[count] = '\n';
+    count++;
     if (*off > 0 || len < count) {
         return 0;
     }
-    
+
     if (copy_to_user(buf, ibuf, count) != 0) {
         return -EFAULT;
     }
