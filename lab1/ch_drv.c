@@ -54,11 +54,14 @@ static struct file_operations fops = {
 static ssize_t my_read(struct file *filp, char __user *buf, size_t len, loff_t *off){
     int count = strlen(ibuf);
     pr_info("Driver: read()\n");
+    u64 i = 0;
+    for(i = 0; i < BUF_SIZE;i++)
+        ibuf[i] = 0;
   
     if (*off > 0 || len < count) {
         return 0;
     }
-    sprintf(ibuf, "%d", coma_count);
+    sprintf(ibuf, "%lld", coma_count);
     
     if (copy_to_user(buf, ibuf, count) != 0) {
         return -EFAULT;
@@ -78,8 +81,8 @@ static ssize_t my_write(struct file *filp, const char __user *buf, size_t len, l
     if (copy_from_user(ibuf, buf, len) != 0) {
       return -EFAULT;
     }
-
-    for(size_t i = 0; i < len; i++){
+    u64 i = 0;
+    for(i = 0; i < len; i++){
         if (ibuf[i] == ','){
             coma_count++;
             if(coma_count <= 0){
