@@ -52,17 +52,18 @@ static struct file_operations fops = {
 };
 
 static ssize_t my_read(struct file *filp, char __user *buf, size_t len, loff_t *off){
-    int count = strlen(ibuf);
     pr_info("Driver: read()\n");
     u64 i = 0;
     for(i = 0; i < BUF_SIZE;i++)
         ibuf[i] = 0;
-  
+    sprintf(ibuf, "%lld", coma_count);
+    int count = strlen(ibuf);
+    ibuf[count] = '\n';
+    count++;
     if (*off > 0 || len < count) {
         return 0;
     }
-    sprintf(ibuf, "%lld", coma_count);
-    
+
     if (copy_to_user(buf, ibuf, count) != 0) {
         return -EFAULT;
     }
