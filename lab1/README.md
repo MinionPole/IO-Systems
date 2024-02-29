@@ -20,9 +20,12 @@ make remove
 ## Инструкция пользователя
 sudo cat /dev/io_lab - открыть символьное устройство
 sudo echo "smth" >> /dev/io_lab - вставить в символьное устройство
+make clean - удалить файлы компиляции из директории
 
 ## Примеры использования
 make install
+sudo chmod 777 /dev/io_lab
+
 sudo cat /dev/io_lab
 
 <font color="green">0</font>
