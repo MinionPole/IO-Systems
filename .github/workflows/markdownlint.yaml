@@ -1,0 +1,16 @@
+name: Markdown Lint
+
+on: [push, pull_request]
+
+jobs:
+ markdownlint:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Run markdownlint
+      uses: docker://ghcr.io/igorshubovych/markdownlint-cli:latest
+      with:
+        entrypoint: [""]
+        args: ["markdownlint", "."]

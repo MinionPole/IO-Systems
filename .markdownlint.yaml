@@ -1,0 +1,13 @@
+# all markdown
+MD013:
+  line_length: 10000
+  heading_line_length: 120
+  code_block_line_length: 120
+  code_blocks: true
+  tables: true
+  headings: true
+  strict: false
+  stern: false
+MD007: # Unordered list indentation
+  indent: 4
+MD051: false # Link fragments should be valid
