@@ -1,0 +1,5 @@
+# Makefile cache
+.cache.mk
+
+*.vscode
+.tmp_versions
