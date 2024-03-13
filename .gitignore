@@ -3,3 +3,6 @@
 
 *.vscode
 .tmp_versions
+.DS_Store
+.DS_Store?
+._*
