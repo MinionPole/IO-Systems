@@ -12,5 +12,5 @@ jobs:
     - name: Run markdownlint
       uses: docker://ghcr.io/igorshubovych/markdownlint-cli:latest
       with:
-        entrypoint: [""]
-        args: ["markdownlint", "."]
+        entrypoint: ""
+        args: "markdownlint ."
