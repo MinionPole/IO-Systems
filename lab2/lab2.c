@@ -10,10 +10,10 @@
 #include <linux/string.h>
 
 
-#define MEMSIZE 0xF000 // Size of Ram disk in sectors
-int c = 0; //Variable for Major Number 
+/* Variable for Major Number */
+int c = 0;
 
-#define SECTOR_SIZE 512
+#define SECTOR_SIZE 512  /* bytes */
 #define MBR_SIZE SECTOR_SIZE
 #define MBR_DISK_SIGNATURE_OFFSET 440
 #define MBR_DISK_SIGNATURE_SIZE 4
@@ -30,17 +30,31 @@ int c = 0; //Variable for Major Number
 
 typedef struct
 {
-	unsigned char boot_type; // 0x00 - Inactive; 0x80 - Active (Bootable)
+
+	/* 0x00 - Inactive; 0x80 - Active (Bootable) */
+	unsigned char boot_type;
+
+	/* CHS of part first sector, sectors enumerated from one */
+	/* https://ru.wikipedia.org/wiki/CHS */
 	unsigned char start_head;
 	unsigned char start_sec:6;
 	unsigned char start_cyl_hi:2;
 	unsigned char start_cyl;
+
+	/* 0x83 - primary part, 0x05 - extended part */
 	unsigned char part_type;
+
+	/* CHS of part last sector, sectors enumerated from one */
 	unsigned char end_head;
 	unsigned char end_sec:6;
 	unsigned char end_cyl_hi:2;
 	unsigned char end_cyl;
+
+	/* LBA of part first sector */
+    /* https://ru.wikipedia.org/wiki/LBA */
 	unsigned int abs_start_sec;
+
+	/* count of sectors in part */
 	unsigned int sec_in_part;
 } PartEntry;
 
@@ -55,101 +69,174 @@ typedef PartEntry PartTable[4];
 #define head4size(s) (((s) % CYL_SIZE) / HEAD_SIZE)
 #define cyl4size(s) ((s) / CYL_SIZE)
 
+#define MB2SEC(mb) (mb * 1024 * 1024 / SECTOR_SIZE)
+
+#define PRM 0x83
+#define EXT 0x05
+
+/****************************************************************************************
+* LBA -> CHS & CHS -> LBA	
+* _______________________________________________________________________________________																		
+*																						
+* LBA = (C × HPC + H) × SPT + (S − 1)
+*
+* C = LBA ÷ (HPC × SPT)
+* H = (LBA ÷ SPT) mod HPC
+* S = (LBA mod SPT) + 1													
+* _______________________________________________________________________________________			
+* LBA is the logical block address														
+* C, H and S are the cylinder number, the head number, and the sector number			
+* HPC is the maximum number of heads per cylinder										
+* SPT is the maximum number of sectors per track
+* _______________________________________________________________________________________
+* https://en.wikipedia.org/wiki/Logical_block_addressing
+*****************************************************************************************/
+
+#define HPC HEAD_PER_CYL
+#define SPT SEC_PER_HEAD
+
+#define lba2cyl(lba) ((unsigned char)(lba / (HPC * SPT)))
+#define lba2head(lba) ((unsigned char)((lba / SPT) % HPC))
+#define lba2sec(lba) ((unsigned char)((lba % SPT) + 1))
+
+/****************************************************************************************
+ * 							PARTITIONS
+ *								 50  <----- MEMSIZE
+ * 								 / \
+ *     			  PRT1_1 -----> 2 + 48 <----- PRT1_2
+ * 									/|\
+ * 					PRT2_1 -----> 10 18 20 <----- PRT2_3
+ * 									 ⋀
+ * 						  PRT2_3 ____/
+ * 								  		
+*****************************************************************************************/
+
+#define SEC_START 0x1
+
+/*  Size of Ram disk in sectors */
+#define MEMSIZE MB2SEC(50) 
+
+/* Sizes of logical partitions */
+#define PRT1_1 MB2SEC(2)
+#define PRT2_1 MB2SEC(10)
+#define PRT2_2 MB2SEC(18)
+#define PRT2_3 MB2SEC(20)
+
+/* Sizes of extended partitions */
+#define EXTP_1 PRT2_1 + PRT2_2 + PRT2_3
+#define EXTP_2_1 PRT2_2 + PRT2_3
+#define EXTP_2_2 PRT2_3
+
+
 
 static PartTable def_part_table =
 {
 	{
 		boot_type: 0x00,
-		start_sec: 0x2,
-		start_head: 0x0,
-		start_cyl: 0x0,
-		part_type: 0x83,
-		end_head: 0x3,
-		end_sec: 0x20,
-		end_cyl: 0x9F,
-		abs_start_sec: 0x1,
-		sec_in_part: 0x0FFF // 2Mbyte
+		start_sec: (lba2sec(SEC_START) & 0x3F),
+		start_head: lba2head(SEC_START),
+		start_cyl: (lba2cyl(SEC_START) & 0xFF),
+		start_cyl_hi: (lba2cyl(SEC_START) & 0x300),
+		part_type: PRM,
+		end_head: lba2sec(SEC_START + PRT1_1 - 1),
+		end_sec: lba2head(SEC_START + PRT1_1 - 1) & 0x3F,
+		end_cyl: (lba2cyl(SEC_START + PRT1_1 - 1) & 0xFF),
+		end_cyl_hi: (lba2cyl(SEC_START + PRT1_1 - 1) & 0x300),
+		abs_start_sec: SEC_START,
+		sec_in_part: PRT1_1 // 2Mbyte
 	},
 	{
 		boot_type: 0x00,
-		start_head: 0x4,
-		start_sec: 0x1,
-		start_cyl: 0x0,
-		part_type: 0x05, // extended partition type
-		end_sec: 0x20,
-		end_head: 0xB,
-		end_cyl: 0x9F,
-		abs_start_sec: 0x1000,
-		sec_in_part: 0x18000 // 48Mbyte
+		start_head: lba2head(SEC_START + PRT1_1),
+		start_sec: lba2sec(SEC_START + PRT1_1) & 0x3F,
+		start_cyl: lba2cyl(SEC_START + PRT1_1) & 0xFF,
+		start_cyl_hi: lba2cyl(SEC_START + PRT1_1) & 0x300,
+		part_type: EXT, // extended partition type
+		end_sec: lba2sec(SEC_START + PRT1_1 + EXTP_1 - 1),
+		end_head: lba2head(SEC_START + PRT1_1 + EXTP_1 - 1),
+		end_cyl: lba2cyl(SEC_START + PRT1_1 + EXTP_1 - 1) & 0xFF,
+		end_cyl_hi: lba2cyl(SEC_START + PRT1_1 + EXTP_1 - 1) & 0x300,
+		abs_start_sec: SEC_START + PRT1_1,
+		sec_in_part: EXTP_1 // 48 Mbyte
 	}
 };
-static unsigned int def_log_part_br_abs_start_sector[] = {0x1000, 0x6000, 0xF000};
+static unsigned int def_log_part_br_abs_start_sector[] = {(SEC_START + PRT1_1), (SEC_START + PRT1_1 + PRT2_1), (SEC_START + PRT1_1 + PRT2_1 + PRT2_2)};
 static const PartTable def_log_part_table[] =
 {
 	{
 		{
 			boot_type: 0x00,
-			start_head: 0x4,
-			start_sec: 0x2, 
-			start_cyl: 0x0, 
-			part_type: 0x83,
-			end_head: 0x7,
-			end_sec: 0x20,
-			end_cyl: 0x9F,
-			abs_start_sec: 0x1,
-			sec_in_part: 0x4FFF // 10Mb
+			start_sec: lba2sec(SEC_START)  & 0x3F,
+			start_head: lba2head(SEC_START),
+			start_cyl: lba2cyl(SEC_START) & 0xFF,
+			start_cyl_hi: lba2cyl(SEC_START) & 0x300,
+			part_type: PRM,
+			end_head: lba2sec(SEC_START + PRT2_1 - 1),
+			end_sec: lba2head(SEC_START + PRT2_1 - 1)  & 0x3F,
+			end_cyl: lba2cyl(SEC_START + PRT2_1 - 1) & 0xFF,
+			end_cyl_hi: lba2cyl(SEC_START + PRT2_1 - 1) & 0x300,
+			abs_start_sec: SEC_START,
+			sec_in_part: PRT2_1 // 10 Mb
 		},
 		{
 			boot_type: 0x00,
-			start_head: 0x8,
-			start_sec: 0x01, 
-			start_cyl: 0x0, 
-			part_type: 0x05,
-			end_head: 0xB,
-			end_sec: 0x20,
-			end_cyl: 0x9F,
-			abs_start_sec: 0x6000,
-			sec_in_part: 0x13000 
-		},
-	}, 
+			start_head: lba2head(SEC_START + PRT2_1),
+			start_sec: lba2sec(SEC_START + PRT2_1)  & 0x3F,
+			start_cyl: lba2cyl(SEC_START + PRT2_1) & 0xFF,
+			start_cyl_hi: lba2cyl(SEC_START + PRT2_1) & 0x300,
+			part_type: EXT,
+			end_head: lba2head(SEC_START + PRT2_1 + EXTP_2_1 - 1),
+			end_sec: lba2head(SEC_START + PRT2_1 + EXTP_2_1 - 1)  & 0x3F,
+			end_cyl: lba2cyl(SEC_START + PRT2_1 + EXTP_2_1 - 1) & 0xFF,
+			end_cyl_hi: lba2cyl(SEC_START + PRT2_1 + EXTP_2_1 - 1) & 0x300,
+			abs_start_sec: PRT2_1,
+			sec_in_part: EXTP_2_1  // 38 Mb
+		}
+	},
 	{
 		{
 			boot_type: 0x00,
-			start_head: 0x8,
-			start_sec: 0x2, 
-			start_cyl: 0x0, 
-			part_type: 0x83,
-			end_head: 0xB,
-			end_sec: 0x20,
-			end_cyl: 0x9F,
-			abs_start_sec: 0x1,
-			sec_in_part: 0x8FFF // 18Mb
+			start_sec: lba2sec(SEC_START) & 0x3F,
+			start_head: lba2head(SEC_START),
+			start_cyl: lba2cyl(SEC_START) & 0xFF,
+			start_cyl_hi: lba2cyl(SEC_START) & 0x300,
+			part_type: PRM,
+			end_head: lba2sec(SEC_START + PRT2_2 - 1),
+			end_sec: lba2head(SEC_START + PRT2_2 - 1) & 0x3F,
+			end_cyl: lba2cyl(SEC_START + PRT2_2 - 1) & 0xFF,
+			end_cyl_hi: lba2cyl(SEC_START + PRT2_2 - 1) & 0x300,
+			abs_start_sec: SEC_START,
+			sec_in_part: PRT2_2 // 18 Mb
 		},
 		{
 			boot_type: 0x00,
-			start_head: 0xC,
-			start_sec: 0x01, 
-			start_cyl: 0x0, 
-			part_type: 0x05,
-			end_head: 0xF,
-			end_sec: 0x20,
-			end_cyl: 0x9F,
-			abs_start_sec: 0xF000,
-			sec_in_part: 0xA000 
-		},
-	}, 
+			start_head: lba2head(SEC_START + PRT2_2),
+			start_sec: lba2sec(SEC_START + PRT2_2) & 0x3F,
+			start_cyl: lba2cyl(SEC_START + PRT2_2) & 0xFF,
+			start_cyl_hi: lba2cyl(SEC_START + PRT2_2) & 0x300,
+			part_type: EXT,
+			end_head: lba2head(SEC_START + PRT2_2 + EXTP_2_2 - 1),
+			end_sec: lba2head(SEC_START + PRT2_2 + EXTP_2_2 - 1) & 0x3F,
+			end_cyl: lba2cyl(SEC_START + PRT2_2 + EXTP_2_2 - 1) & 0xFF,
+			end_cyl_hi: lba2cyl(SEC_START + PRT2_2 + EXTP_2_2 - 1) & 0x300,
+			abs_start_sec: PRT2_2,
+			sec_in_part: EXTP_2_2 // 20 Mb
+		}
+	},
 	{
 		{
 			boot_type: 0x00,
-			start_head: 0xC,
-			start_sec: 0x2, 
-			start_cyl: 0x0, 
-			part_type: 0x83,
-			end_head: 0x7,
-			end_sec: 0x20,
-			end_cyl: 0x9F,
-			abs_start_sec: 0x1,
-			sec_in_part: 0x9FFF // 20Mb
+			start_sec: lba2sec(SEC_START) & 0x3F,
+			start_head: lba2head(SEC_START),
+			start_cyl: lba2cyl(SEC_START) & 0xFF,
+			start_cyl_hi: lba2cyl(SEC_START) & 0x300,
+			part_type: PRM,
+			end_head: lba2sec(SEC_START + PRT2_3 - 1),
+			end_sec: lba2head(SEC_START + PRT2_3 - 1) & 0x3F,
+			end_cyl: lba2cyl(SEC_START + PRT2_3 - 1) & 0xFF,
+			end_cyl_hi: lba2cyl(SEC_START + PRT2_3 - 1) & 0x300,
+			abs_start_sec: SEC_START,
+			sec_in_part: PRT2_3 // 20 Mb
 		}
 	}
 };
@@ -179,7 +266,7 @@ void copy_mbr_n_br(u8 *disk)
 		copy_br(disk, def_log_part_br_abs_start_sector[i], &def_log_part_table[i]);
 	}
 }
-/* Structure associated with Block device*/
+/* Structure associated with Block device */
 struct mydiskdrive_dev 
 {
 	int size;
@@ -255,12 +342,6 @@ static int rb_transfer(struct request *req)
 		
 		if (dir == WRITE) /* Write to the device */
 		{
-			int i = 0;
-			for(; i < sectors*SECTOR_SIZE;i++){
-				if(i < 3)
-					continue;
-				buffer[i] = (buffer[i-1]+buffer[i-2]+buffer[i-3])/3;
-			}
 			memcpy((device.data)+((start_sector+sector_offset)*SECTOR_SIZE)\
 			,buffer,sectors*SECTOR_SIZE);		
 		}
