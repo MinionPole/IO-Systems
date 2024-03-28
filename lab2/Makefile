@@ -10,3 +10,7 @@ install:
 	sudo insmod lab2.ko
 remove:
 	sudo rmmod lab2
+rerun:
+	make remove && make clean && make all && sudo insmod lab2.ko
+fdisk: 
+	sudo fdisk -l /dev/mydisk

@@ -156,11 +156,11 @@ static PartTable def_part_table =
 		end_head: lba2head(SEC_START + PRT1_1 + EXTP_1 - 1),
 		end_cyl: lba2cyl(SEC_START + PRT1_1 + EXTP_1 - 1) & 0xFF,
 		end_cyl_hi: lba2cyl(SEC_START + PRT1_1 + EXTP_1 - 1) & 0x300,
-		abs_start_sec: SEC_START + PRT1_1,
+		abs_start_sec: PRT1_1 + 1,
 		sec_in_part: EXTP_1 // 48 Mbyte
 	}
 };
-static unsigned int def_log_part_br_abs_start_sector[] = {(SEC_START + PRT1_1), (SEC_START + PRT1_1 + PRT2_1), (SEC_START + PRT1_1 + PRT2_1 + PRT2_2)};
+static unsigned int def_log_part_br_abs_start_sector[] = {(PRT1_1 + 1), (PRT1_1 + PRT2_1 + 1), (PRT1_1 + PRT2_1 + PRT2_2 + 1)};
 static const PartTable def_log_part_table[] =
 {
 	{
@@ -190,7 +190,7 @@ static const PartTable def_log_part_table[] =
 			end_cyl: lba2cyl(SEC_START + PRT2_1 + EXTP_2_1 - 1) & 0xFF,
 			end_cyl_hi: lba2cyl(SEC_START + PRT2_1 + EXTP_2_1 - 1) & 0x300,
 			abs_start_sec: PRT2_1,
-			sec_in_part: EXTP_2_1  // 38 Mb
+			sec_in_part: PRT2_2 + 1  // 38 Mb
 		}
 	},
 	{
@@ -219,8 +219,8 @@ static const PartTable def_log_part_table[] =
 			end_sec: lba2head(SEC_START + PRT2_2 + EXTP_2_2 - 1) & 0x3F,
 			end_cyl: lba2cyl(SEC_START + PRT2_2 + EXTP_2_2 - 1) & 0xFF,
 			end_cyl_hi: lba2cyl(SEC_START + PRT2_2 + EXTP_2_2 - 1) & 0x300,
-			abs_start_sec: PRT2_2,
-			sec_in_part: EXTP_2_2 // 20 Mb
+			abs_start_sec: PRT2_2 + PRT2_1,
+			sec_in_part: PRT2_3 + 1 // 20 Mb
 		}
 	},
 	{
